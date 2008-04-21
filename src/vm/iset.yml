@@ -1,0 +1,24 @@
+# Kidy VM Instruction Set
+---
+-
+  name: nop
+  operation: Do nothing.
+  category: misc
+  operands: []
+  stack_before: []
+  stack_after: []
+  description: Do nothing.
+  code: |
+    
+-
+  name: plus
+  operation: Implementation of `value1 + value2`.
+  category: optimize
+  operands: []
+  stack_before: [value1, value2]
+  stack_after: [sum]
+  description: >-
+    Simple plus operation is performed on `Fixnum` or `Float`.
+    But to normal objects, it just acts as `value1.send :+, value2`.
+  code: |
+      
