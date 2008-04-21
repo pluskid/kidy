@@ -1,0 +1,8 @@
+switch (op) {
+<% @instructions.each_with_index do |insn, opcode| %>
+    case <%= opcode %>: { /* <%= insn.name %> */
+      <%= insn.code %>
+      break;
+    }
+<% end %>
+}

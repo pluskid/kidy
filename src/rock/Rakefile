@@ -1,0 +1,6 @@
+# -*- Ruby -*-
+
+file 'iset.inc' => ['iset/iset.yml', 'iset/iset.inc.erb'] do
+  require 'iset/generator'
+  InstructionSetGenerator.generate(File.read('iset/iset.inc.erb'), 'iset.inc')
+end
