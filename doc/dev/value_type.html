@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.5: http://docutils.sourceforge.net/" />
+<title>Value Type in Kidy VM</title>
+<link rel="stylesheet" href="styles.css" type="text/css" />
+</head>
+<body>
+<div class="document" id="value-type-in-kidy-vm">
+<div id="header-region" class="clear-block"></div>
+<div id="wrapper">
+  <div id="container" class="clear-block">
+    <div id="header">
+    <div id="logo-floater">
+    <h1 class="title">Value Type in Kidy VM</h1>
+    </div>
+    <ul class="primary-links">
+      <li>
+        <a title="" href="index.html">Home</a>
+      </li>
+    </ul>
+    </div>
+    <div id="center">
+      <div id="squeeze">
+        <div class="right-corner">
+          <div class="left-corner">
+	  <div class="contents topic" id="contents">
+<p class="topic-title first">Contents</p>
+<ul class="simple">
+<li><a class="reference internal" href="#type-tag" id="id1">Type tag</a><ul>
+<li><a class="reference internal" href="#fixnum-operations-cheap" id="id2">Fixnum operations cheap</a></li>
+<li><a class="reference internal" href="#pointer-access-cheap" id="id3">Pointer access cheap</a></li>
+<li><a class="reference internal" href="#boolean-predicate-cheap" id="id4">Boolean predicate cheap</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<p>Kidy is a dynamic-typed language, variables in Kidy have no type. A
+variable can bind to any type of value. But in the VM, which is
+written in C++ (a static-typed language), we need a type for the
+<em>variable</em> -- <tt class="docutils literal"><span class="pre">KValue</span></tt>.</p>
+<div class="section" id="type-tag">
+<h1><a class="toc-backref" href="#id1">Type tag</a></h1>
+<p>On 32-bit machine, <tt class="docutils literal"><span class="pre">KValue</span></tt> is a 32-bit value. The least 2 bits are
+used to identify the type of the value. We can represent 4 types by
+the 2 bits:</p>
+<ul class="simple">
+<li>Fixnum</li>
+<li>Special Constants</li>
+<li>Symbol</li>
+<li>Object</li>
+</ul>
+<p>I followed some suggestions by Kurt Stephens on his blog post <a class="reference external" href="http://kurtstephens.com/node/52">Ruby
+Internals: Why RUBY_FIXNUM_FLAG should be 0x00</a>. Here's how the bits look like on
+a 32-bit machine:</p>
+<div class="highlight"><pre>xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx00: Fixnum
+00000000 00000000 00000000 00000101: nil
+00000000 00000000 00000000 00010101: undef
+00000000 00000000 00000000 00001101: false
+00000000 00000000 00000000 00001001: true
+xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx10: Symbol
+xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx11: Object
+</pre></div>
+<p>Here's some advantages of this design.</p>
+<div class="section" id="fixnum-operations-cheap">
+<h2><a class="toc-backref" href="#id2">Fixnum operations cheap</a></h2>
+<p>When there are <strong>no overflow</strong>, some operations for Fixnum can be very
+cheap:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="18%" />
+<col width="48%" />
+<col width="34%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Operation</th>
+<th class="head">Original form</th>
+<th class="head">Optimized form</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>plus</td>
+<td><tt class="docutils literal"><span class="pre">((a&gt;&gt;2)+(b&gt;&gt;2))</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
+<td><tt class="docutils literal"><span class="pre">a+b</span></tt></td>
+</tr>
+<tr><td>minus</td>
+<td><tt class="docutils literal"><span class="pre">((a&gt;&gt;2)-(b&gt;&gt;2))</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
+<td><tt class="docutils literal"><span class="pre">a-b</span></tt></td>
+</tr>
+<tr><td>multiply</td>
+<td><tt class="docutils literal"><span class="pre">((a&gt;&gt;2)*(b&gt;&gt;2))</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
+<td><tt class="docutils literal"><span class="pre">(a&gt;&gt;2)*b</span></tt></td>
+</tr>
+<tr><td>divide</td>
+<td><tt class="docutils literal"><span class="pre">((a&gt;&gt;2)*(b&gt;&gt;2))</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
+<td><tt class="docutils literal"><span class="pre">(a/b)</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="pointer-access-cheap">
+<h2><a class="toc-backref" href="#id3">Pointer access cheap</a></h2>
+<p>Compilers and dynamic memory allocators will align allocations to word
+boundaries for performance reasons. So the least two bits of a pointer
+will always be zero (<em>note this is not always portable</em>) and can be
+safely used for type tagging.</p>
+<p>Here I take the examples from Kurt Stephens' blog:</p>
+<div class="highlight"><pre><span style="color: #BC7A00">#define RBASIC(X) ((struct RBasic *)((X) - 3))</span>
+</pre></div>
+<p><tt class="docutils literal"><span class="pre">-</span> <span class="pre">3</span></tt> is used instead of <tt class="docutils literal"><span class="pre">&amp;</span> <span class="pre">3</span></tt> here is because this can be used
+for optimization by compiler. The compiler converts
+<tt class="docutils literal"><span class="pre">pointer-&gt;member</span></tt> expression into an offset from an address. For
+example, if the <tt class="docutils literal"><span class="pre">RBasic</span></tt> struct is deined like this:</p>
+<div class="highlight"><pre><span style="color: #008000; font-weight: bold">struct</span> RBasic {
+    VALUE flags; <span style="color: #408080; font-style: italic">/* struct offset: + 0 */</span>
+    VALUE klass; <span style="color: #408080; font-style: italic">/* struct offset: + 4 */</span>
+};
+</pre></div>
+<p>Then compiler will convert <tt class="docutils literal"><span class="pre">RBASIC(X)-&gt;klass</span></tt> to <tt class="docutils literal"><span class="pre">RBASIC(X)</span> <span class="pre">+</span> <span class="pre">4</span></tt>
+which is really <tt class="docutils literal"><span class="pre">((X)</span> <span class="pre">-</span> <span class="pre">3)</span> <span class="pre">+</span> <span class="pre">4</span></tt>. This can be compiled as <tt class="docutils literal"><span class="pre">X</span> <span class="pre">+</span> <span class="pre">1</span></tt>
+directly by the compiler.</p>
+</div>
+<div class="section" id="boolean-predicate-cheap">
+<h2><a class="toc-backref" href="#id4">Boolean predicate cheap</a></h2>
+<p>In Kidy, all values except <tt class="docutils literal"><span class="pre">nil</span></tt>, <tt class="docutils literal"><span class="pre">false</span></tt> and <tt class="docutils literal"><span class="pre">undef</span></tt> are
+regards as <em>true</em>. If you notice the common shape of the three
+particular values, you'll see that boolean predict can be very simple:</p>
+<div class="highlight"><pre><span style="color: #008000; font-weight: bold">inline</span> <span style="color: #B00040">bool</span> is_true(KValue val) {
+    <span style="color: #008000; font-weight: bold">return</span> (val <span style="color: #666666">&amp;</span> <span style="color: #666666">0x5</span>) <span style="color: #666666">!=</span> <span style="color: #666666">0x5</span>;
+}
+</pre></div>
+</div>
+</div>
+	  </div>
+	</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>

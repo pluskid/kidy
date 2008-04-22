@@ -1,0 +1,10 @@
+# -*- Ruby -*-
+
+rule '.html' => '.rst' do |t|
+  sh "./compile-doc.py #{t.source} > #{t.name}"
+end
+
+desc "Generate HTML document"
+task :doc => FileList['*.rst'].ext('html')
+
+task :default => :doc
