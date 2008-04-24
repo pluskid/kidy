@@ -29,12 +29,12 @@ a 32-bit machine:
 .. sourcecode:: text
 
   xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx00: Fixnum
-  00000000 00000000 00000000 00000101: nil
-  00000000 00000000 00000000 00010101: undef
-  00000000 00000000 00000000 00001101: false
-  00000000 00000000 00000000 00001001: true
-  xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx10: Symbol
-  xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx11: Object
+  00000000 00000000 00000000 00000111: nil
+  00000000 00000000 00000000 00010111: undef
+  00000000 00000000 00000000 00001111: false
+  00000000 00000000 00000000 00001011: true
+  xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx01: Symbol
+  xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx10: Object
 
 Here's some advantages of this design.
 
@@ -65,7 +65,7 @@ Here I take the examples from Kurt Stephens' blog:
 
 .. sourcecode:: c
   
-  #define RBASIC(X) ((struct RBasic *)((X) - 3))
+  #define RBASIC(X) ((struct RBasic *)((X) - 2))
 
 ``- 3`` is used instead of ``& 3`` here is because this can be used
 for optimization by compiler. The compiler converts
@@ -80,7 +80,7 @@ example, if the ``RBasic`` struct is deined like this:
   };
 
 Then compiler will convert ``RBASIC(X)->klass`` to ``RBASIC(X) + 4``
-which is really ``((X) - 3) + 4``. This can be compiled as ``X + 1``
+which is really ``((X) - 2) + 4``. This can be compiled as ``X + 2``
 directly by the compiler.
 
 Boolean predict cheap
@@ -93,5 +93,5 @@ particular values, you'll see that boolean predict can be very simple:
 .. sourcecode:: c++
 
   inline bool is_true(KValue val) {
-      return (val & 0x5) != 0x5;
+      return (val & 0x7) != 0x7;
   }

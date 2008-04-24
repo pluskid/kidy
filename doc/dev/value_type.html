@@ -32,7 +32,7 @@
 <li><a class="reference internal" href="#type-tag" id="id1">Type tag</a><ul>
 <li><a class="reference internal" href="#fixnum-operations-cheap" id="id2">Fixnum operations cheap</a></li>
 <li><a class="reference internal" href="#pointer-access-cheap" id="id3">Pointer access cheap</a></li>
-<li><a class="reference internal" href="#boolean-predicate-cheap" id="id4">Boolean predicate cheap</a></li>
+<li><a class="reference internal" href="#boolean-predict-cheap" id="id4">Boolean predict cheap</a></li>
 </ul>
 </li>
 </ul>
@@ -56,12 +56,12 @@ the 2 bits:</p>
 Internals: Why RUBY_FIXNUM_FLAG should be 0x00</a>. Here's how the bits look like on
 a 32-bit machine:</p>
 <div class="highlight"><pre>xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx00: Fixnum
-00000000 00000000 00000000 00000101: nil
-00000000 00000000 00000000 00010101: undef
-00000000 00000000 00000000 00001101: false
-00000000 00000000 00000000 00001001: true
-xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx10: Symbol
-xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx11: Object
+00000000 00000000 00000000 00000111: nil
+00000000 00000000 00000000 00010111: undef
+00000000 00000000 00000000 00001111: false
+00000000 00000000 00000000 00001011: true
+xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx01: Symbol
+xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx10: Object
 </pre></div>
 <p>Here's some advantages of this design.</p>
 <div class="section" id="fixnum-operations-cheap">
@@ -107,7 +107,7 @@ boundaries for performance reasons. So the least two bits of a pointer
 will always be zero (<em>note this is not always portable</em>) and can be
 safely used for type tagging.</p>
 <p>Here I take the examples from Kurt Stephens' blog:</p>
-<div class="highlight"><pre><span style="color: #BC7A00">#define RBASIC(X) ((struct RBasic *)((X) - 3))</span>
+<div class="highlight"><pre><span style="color: #BC7A00">#define RBASIC(X) ((struct RBasic *)((X) - 2))</span>
 </pre></div>
 <p><tt class="docutils literal"><span class="pre">-</span> <span class="pre">3</span></tt> is used instead of <tt class="docutils literal"><span class="pre">&amp;</span> <span class="pre">3</span></tt> here is because this can be used
 for optimization by compiler. The compiler converts
@@ -119,16 +119,16 @@ example, if the <tt class="docutils literal"><span class="pre">RBasic</span></tt
 };
 </pre></div>
 <p>Then compiler will convert <tt class="docutils literal"><span class="pre">RBASIC(X)-&gt;klass</span></tt> to <tt class="docutils literal"><span class="pre">RBASIC(X)</span> <span class="pre">+</span> <span class="pre">4</span></tt>
-which is really <tt class="docutils literal"><span class="pre">((X)</span> <span class="pre">-</span> <span class="pre">3)</span> <span class="pre">+</span> <span class="pre">4</span></tt>. This can be compiled as <tt class="docutils literal"><span class="pre">X</span> <span class="pre">+</span> <span class="pre">1</span></tt>
+which is really <tt class="docutils literal"><span class="pre">((X)</span> <span class="pre">-</span> <span class="pre">2)</span> <span class="pre">+</span> <span class="pre">4</span></tt>. This can be compiled as <tt class="docutils literal"><span class="pre">X</span> <span class="pre">+</span> <span class="pre">2</span></tt>
 directly by the compiler.</p>
 </div>
-<div class="section" id="boolean-predicate-cheap">
-<h2><a class="toc-backref" href="#id4">Boolean predicate cheap</a></h2>
+<div class="section" id="boolean-predict-cheap">
+<h2><a class="toc-backref" href="#id4">Boolean predict cheap</a></h2>
 <p>In Kidy, all values except <tt class="docutils literal"><span class="pre">nil</span></tt>, <tt class="docutils literal"><span class="pre">false</span></tt> and <tt class="docutils literal"><span class="pre">undef</span></tt> are
 regards as <em>true</em>. If you notice the common shape of the three
 particular values, you'll see that boolean predict can be very simple:</p>
 <div class="highlight"><pre><span style="color: #008000; font-weight: bold">inline</span> <span style="color: #B00040">bool</span> is_true(KValue val) {
-    <span style="color: #008000; font-weight: bold">return</span> (val <span style="color: #666666">&amp;</span> <span style="color: #666666">0x5</span>) <span style="color: #666666">!=</span> <span style="color: #666666">0x5</span>;
+    <span style="color: #008000; font-weight: bold">return</span> (val <span style="color: #666666">&amp;</span> <span style="color: #666666">0x7</span>) <span style="color: #666666">!=</span> <span style="color: #666666">0x7</span>;
 }
 </pre></div>
 </div>
