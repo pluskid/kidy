@@ -14,12 +14,7 @@
 <div class="contents topic" id="contents">
 <p class="topic-title first">Contents</p>
 <ul class="simple">
-<li><a class="reference internal" href="#type-tag" id="id1">Type tag</a><ul>
-<li><a class="reference internal" href="#fixnum-operations-cheap" id="id2">Fixnum operations cheap</a></li>
-<li><a class="reference internal" href="#pointer-access-cheap" id="id3">Pointer access cheap</a></li>
-<li><a class="reference internal" href="#boolean-predict-cheap" id="id4">Boolean predict cheap</a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#type-tag" id="id1">Type tag</a></li>
 </ul>
 </div>
 <p>Kidy is a dynamic-typed language, variables in Kidy have no type. A
@@ -28,95 +23,31 @@ written in C++ (a static-typed language), we need a type for the
 <em>variable</em> -- <tt class="docutils literal"><span class="pre">KValue</span></tt>.</p>
 <div class="section" id="type-tag">
 <h1><a class="toc-backref" href="#id1">Type tag</a></h1>
-<p>On 32-bit machine, <tt class="docutils literal"><span class="pre">KValue</span></tt> is a 32-bit value. The least 2 bits are
-used to identify the type of the value. We can represent 4 types by
-the 2 bits:</p>
+<p>On 32-bit machine, <tt class="docutils literal"><span class="pre">KValue</span></tt> is a 32-bit value. The least 1 or more
+bits are used to identify the type of the value.</p>
+<p>There are two articles discussed whether fixed length tag or variable
+length tag is better and whether tag 0 or tag 1 should be used for
+pointers.</p>
 <ul class="simple">
-<li>Fixnum</li>
-<li>Special Constants</li>
-<li>Symbol</li>
-<li>Object</li>
+<li><a class="reference external" href="http://kurtstephens.com/node/52">Ruby Internals: Why RUBY_FIXNUM_FLAG should be 0x00</a>.</li>
+<li><a class="reference external" href="http://kurtstephens.com/node/60">Parameterized Word Tagging in Latently-Typed Languages</a>.</li>
 </ul>
-<p>I followed some suggestions by Kurt Stephens on his blog post <a class="reference external" href="http://kurtstephens.com/node/52">Ruby
-Internals: Why RUBY_FIXNUM_FLAG should be 0x00</a>. Here's how the bits look like on
-a 32-bit machine:</p>
-<div class="highlight"><pre>xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx00: Fixnum
-00000000 00000000 00000000 00000111: nil
-00000000 00000000 00000000 00010111: undef
-00000000 00000000 00000000 00001111: false
-00000000 00000000 00000000 00001011: true
-xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx01: Symbol
-xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx10: Object
+<p>Kidy uses variable length tag and tag 1 for fixnums:</p>
+<div class="highlight"><pre>xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxx1: Fixnum
+00000000 00000000 00000000 00001110: nil
+00000000 00000000 00000000 00011110: undef
+00000000 00000000 00000000 00101110: false
+00000000 00000000 00000000 00000110: true
+xxxxxxxx xxxxxxxx xxxxxxxx xxxxx010: Symbol
+xxxxxxxx xxxxxxxx xxxxxxxx xxxxxx00: Object
 </pre></div>
-<p>Here's some advantages of this design.</p>
-<div class="section" id="fixnum-operations-cheap">
-<h2><a class="toc-backref" href="#id2">Fixnum operations cheap</a></h2>
-<p>When there are <strong>no overflow</strong>, some operations for Fixnum can be very
-cheap:</p>
-<table border="1" class="docutils">
-<colgroup>
-<col width="18%" />
-<col width="48%" />
-<col width="34%" />
-</colgroup>
-<thead valign="bottom">
-<tr><th class="head">Operation</th>
-<th class="head">Original form</th>
-<th class="head">Optimized form</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr><td>plus</td>
-<td><tt class="docutils literal"><span class="pre">((a&gt;&gt;2)+(b&gt;&gt;2))</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
-<td><tt class="docutils literal"><span class="pre">a+b</span></tt></td>
-</tr>
-<tr><td>minus</td>
-<td><tt class="docutils literal"><span class="pre">((a&gt;&gt;2)-(b&gt;&gt;2))</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
-<td><tt class="docutils literal"><span class="pre">a-b</span></tt></td>
-</tr>
-<tr><td>multiply</td>
-<td><tt class="docutils literal"><span class="pre">((a&gt;&gt;2)*(b&gt;&gt;2))</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
-<td><tt class="docutils literal"><span class="pre">(a&gt;&gt;2)*b</span></tt></td>
-</tr>
-<tr><td>divide</td>
-<td><tt class="docutils literal"><span class="pre">((a&gt;&gt;2)*(b&gt;&gt;2))</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
-<td><tt class="docutils literal"><span class="pre">(a/b)</span> <span class="pre">&lt;&lt;</span> <span class="pre">2</span></tt></td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section" id="pointer-access-cheap">
-<h2><a class="toc-backref" href="#id3">Pointer access cheap</a></h2>
-<p>Compilers and dynamic memory allocators will align allocations to word
-boundaries for performance reasons. So the least two bits of a pointer
-will always be zero (<em>note this is not always portable</em>) and can be
-safely used for type tagging.</p>
-<p>Here I take the examples from Kurt Stephens' blog:</p>
-<div class="highlight"><pre><span style="color: #BC7A00">#define RBASIC(X) ((struct RBasic *)((X) - 2))</span>
-</pre></div>
-<p><tt class="docutils literal"><span class="pre">-</span> <span class="pre">3</span></tt> is used instead of <tt class="docutils literal"><span class="pre">&amp;</span> <span class="pre">3</span></tt> here is because this can be used
-for optimization by compiler. The compiler converts
-<tt class="docutils literal"><span class="pre">pointer-&gt;member</span></tt> expression into an offset from an address. For
-example, if the <tt class="docutils literal"><span class="pre">RBasic</span></tt> struct is deined like this:</p>
-<div class="highlight"><pre><span style="color: #008000; font-weight: bold">struct</span> RBasic {
-    VALUE flags; <span style="color: #408080; font-style: italic">/* struct offset: + 0 */</span>
-    VALUE klass; <span style="color: #408080; font-style: italic">/* struct offset: + 4 */</span>
-};
-</pre></div>
-<p>Then compiler will convert <tt class="docutils literal"><span class="pre">RBASIC(X)-&gt;klass</span></tt> to <tt class="docutils literal"><span class="pre">RBASIC(X)</span> <span class="pre">+</span> <span class="pre">4</span></tt>
-which is really <tt class="docutils literal"><span class="pre">((X)</span> <span class="pre">-</span> <span class="pre">2)</span> <span class="pre">+</span> <span class="pre">4</span></tt>. This can be compiled as <tt class="docutils literal"><span class="pre">X</span> <span class="pre">+</span> <span class="pre">2</span></tt>
-directly by the compiler.</p>
-</div>
-<div class="section" id="boolean-predict-cheap">
-<h2><a class="toc-backref" href="#id4">Boolean predict cheap</a></h2>
-<p>In Kidy, all values except <tt class="docutils literal"><span class="pre">nil</span></tt>, <tt class="docutils literal"><span class="pre">false</span></tt> and <tt class="docutils literal"><span class="pre">undef</span></tt> are
-regards as <em>true</em>. If you notice the common shape of the three
-particular values, you'll see that boolean predict can be very simple:</p>
+<p>In this design, <tt class="docutils literal"><span class="pre">nil</span></tt>, <tt class="docutils literal"><span class="pre">false</span></tt> and <tt class="docutils literal"><span class="pre">undef</span></tt> share a common tail
+<tt class="docutils literal"><span class="pre">1110</span></tt>. In Kidy, every value except those three are regards as
+<em>true</em>. So a bool predicate can be very simple:</p>
 <div class="highlight"><pre><span style="color: #008000; font-weight: bold">inline</span> <span style="color: #B00040">bool</span> is_true(KValue val) {
-    <span style="color: #008000; font-weight: bold">return</span> (val <span style="color: #666666">&amp;</span> <span style="color: #666666">0x7</span>) <span style="color: #666666">!=</span> <span style="color: #666666">0x7</span>;
+    <span style="color: #008000; font-weight: bold">return</span> (val <span style="color: #666666">&amp;</span> <span style="color: #666666">0xF</span>) <span style="color: #666666">!=</span> <span style="color: #666666">0xE</span>;
 }
 </pre></div>
-</div>
 </div>
 </div>
 </body>
